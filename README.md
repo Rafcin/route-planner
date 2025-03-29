@@ -2,7 +2,7 @@
 
 A high-performance API and web application for optimizing multi-stop routes using the Traveling Salesperson Problem (TSP) algorithm.
 
-![Route Planner Interface](/static/Screenshot%202025-03-29%20at%202.51.21%20PM.png)
+![Screenshot 2025-03-29 at 2.51.21 PM.png](static/Screenshot%202025-03-29%20at%202.51.21%E2%80%AFPM.png)
 
 ## Features
 
