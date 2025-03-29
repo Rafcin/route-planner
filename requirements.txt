@@ -1,0 +1,21 @@
+# Installs the latest stable versions available on PyPI at installation time.
+# For reproducible builds (recommended for production), pin versions
+# after testing (e.g., using 'pip freeze > requirements.txt').
+
+fastapi
+uvicorn[standard]
+ortools # Correct package name for OR-Tools
+pydantic
+pydantic-settings>=2.0.0
+requests
+
+# Added for improvements:
+slowapi>=0.1.9 # Rate limiting
+structlog>=23.1.0 # Structured logging
+fastapi-simple-security>=1.1.0 # API Key Security library
+
+# Optional, can be removed if not explicitly used elsewhere
+# python-dotenv # pydantic-settings handles .env loading
+
+# Optional, needed if using Redis for rate limiting:
+# redis>=4.0.0

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Route Optimizer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    /* Custom Styles */
+    #map {
+      min-height: 550px;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .api-key-input:focus {
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    }
+
+    .icon-spin {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Remove spinner from number inputs */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+
+    /* Smooth transitions */
+    .transition-all {
+      transition: all 0.3s ease;
+    }
+
+    /* Custom scrollbar for code block */
+    #apiResponse::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    #apiResponse::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+
+    #apiResponse::-webkit-scrollbar-thumb {
+      background: #ddd;
+      border-radius: 4px;
+    }
+
+    #apiResponse::-webkit-scrollbar-thumb:hover {
+      background: #ccc;
+    }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      background-color: #4338ca;
+      color: white;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transform: translateY(-100px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+  <!-- Toast Notification -->
+  <div id="toast" class="toast">
+    <div class="flex items-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+      </svg>
+      <span id="toastMessage">Copied to clipboard!</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-indigo-600 to-blue-500 text-white shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 transform hover:rotate-45 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+          <h1 class="text-2xl font-bold leading-tight">Route Optimizer</h1>
+        </div>
+        <div class="flex space-x-3">
+          <a href="/docs" target="_blank" class="bg-white/20 hover:bg-white/30 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-all duration-200 flex items-center text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Swagger Docs
+          </a>
+          <a href="/redoc" target="_blank" class="bg-white/20 hover:bg-white/30 text-white font-medium py-2 px-4 rounded-lg shadow-sm transition-all duration-200 flex items-center text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            ReDoc
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Input Column -->
+      <div class="lg:col-span-1 space-y-6">
+        <!-- Authentication Card -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition-all hover:shadow">
+          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            </svg>
+            Authentication
+          </h2>
+          <div>
+            <label for="apiKeyInput" class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="Enter your API Key"
+                class="api-key-input w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+              />
+            </div>
+            <p class="mt-1 text-xs text-gray-500">
+              Get keys from the <a href="/docs" class="text-indigo-600 hover:text-indigo-800 hover:underline">API Docs</a> portal.
+            </p>
+          </div>
+        </div>
+
+        <!-- Locations & Options Card -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition-all hover:shadow">
+          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Locations &amp; Options
+          </h2>
+
+          <!-- Locations JSON -->
+          <div class="mb-5">
+            <label for="locationsInput" class="block text-sm font-medium text-gray-700 mb-1">Locations (JSON Array)</label>
+            <div class="bg-gray-50 rounded-lg p-2 mb-2">
+              <p class="text-xs text-gray-600">
+                First location is the depot. Required fields per location: <code class="bg-gray-200 px-1 rounded">latitude</code> and <code class="bg-gray-200 px-1 rounded">longitude</code>.
+                <code class="bg-gray-200 px-1 rounded">id</code> is optional.
+              </p>
+            </div>
+            <textarea
+              id="locationsInput"
+              rows="7"
+              class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm transition-all"
+              placeholder='[{"latitude": 40.7, "longitude": -74.0}, ...]'
+            ></textarea>
+          </div>
+
+          <!-- Example Data Buttons -->
+          <div class="flex space-x-3 mb-5">
+            <button id="loadNYCButton" class="flex-1 bg-gray-100 text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 flex flex-col items-center justify-center">
+              <span class="text-xs">NYC Example</span>
+            </button>
+            <button id="loadExampleButton" class="flex-1 bg-gray-100 text-gray-700 font-medium py-2 px-3 rounded-lg hover:bg-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all duration-200 flex flex-col items-center justify-center">
+              <span class="text-xs">Jacksonville Example</span>
+            </button>
+          </div>
+
+          <!-- Parameters Section -->
+          <div class="border-t border-gray-200 pt-4 mb-2">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Solver Parameters
+            </h3>
+            
+            <div class="bg-blue-50 p-2 rounded-lg mb-3 text-xs text-gray-700">
+              <p class="mb-1"><strong>Customize your optimization:</strong></p>
+              <ul class="list-disc list-inside space-y-1 pl-1">
+                <li><strong>Solver Time Limit</strong>: Set maximum computation time (seconds)</li>
+                <li><strong>Local Search Strategy</strong>: Algorithm for refining solutions</li>
+                <li><strong>First Solution Strategy</strong>: Method for generating initial route</li>
+              </ul>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label for="averageSpeed" class="block text-xs font-medium text-gray-600 mb-1">
+                  Avg. Speed (km/h)
+                  <span class="text-gray-400 text-[10px]">For duration calculation</span>
+                </label>
+                <input
+                  type="number"
+                  id="averageSpeed"
+                  placeholder="Default (50)"
+                  min="1"
+                  step="0.1"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                >
+              </div>
+              <div>
+                <label for="outlierThreshold" class="block text-xs font-medium text-gray-600 mb-1">
+                  Outlier Threshold (km)
+                  <span class="text-gray-400 text-[10px]">Filter distant locations</span>
+                </label>
+                <input
+                  type="number"
+                  id="outlierThreshold"
+                  placeholder="Default (80)"
+                  min="0"
+                  step="0.1"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                >
+              </div>
+              <div>
+                <label for="solverTimeLimit" class="block text-xs font-medium text-gray-600 mb-1">
+                  Solver Time Limit (s)
+                  <span class="text-gray-400 text-[10px]">Max computation time</span>
+                </label>
+                <input
+                  type="number"
+                  id="solverTimeLimit"
+                  placeholder="Default (30)"
+                  min="1"
+                  value="15"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all"
+                >
+              </div>
+              <div>
+                <label for="localSearchStrategy" class="block text-xs font-medium text-gray-600 mb-1">
+                  Local Search Strategy
+                  <span class="text-gray-400 text-[10px]">Solution refinement method</span>
+                </label>
+                <select
+                  id="localSearchStrategy"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white transition-all"
+                >
+                  <option value="">Default (TABU_SEARCH)</option>
+                  <option value="AUTOMATIC">AUTOMATIC - Let OR-Tools decide</option>
+                  <option value="GREEDY_DESCENT">GREEDY_DESCENT - Fast, basic</option>
+                  <option value="GUIDED_LOCAL_SEARCH">GUIDED_LOCAL_SEARCH - Best quality</option>
+                  <option value="SIMULATED_ANNEALING">SIMULATED_ANNEALING - Escape local optima</option>
+                  <option value="TABU_SEARCH">TABU_SEARCH - Balanced speed/quality</option>
+                </select>
+              </div>
+              <div class="col-span-2">
+                <label for="firstSolutionStrategy" class="block text-xs font-medium text-gray-600 mb-1">
+                  First Solution Strategy
+                  <span class="text-gray-400 text-[10px]">Initial route creation method</span>
+                </label>
+                <select
+                  id="firstSolutionStrategy"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 text-sm bg-white transition-all"
+                >
+                  <option value="">Default (PATH_CHEAPEST_ARC)</option>
+                  <option value="AUTOMATIC">AUTOMATIC - Let OR-Tools decide</option>
+                  <option value="PATH_CHEAPEST_ARC">PATH_CHEAPEST_ARC - Good general choice</option>
+                  <option value="SAVINGS">SAVINGS - Clarke-Wright algorithm</option>
+                  <option value="SWEEP">SWEEP - Angle-based construction</option>
+                  <option value="CHRISTOFIDES">CHRISTOFIDES - For Euclidean TSP</option>
+                  <option value="BEST_INSERTION">BEST_INSERTION - Evaluates all positions</option>
+                  <option value="PARALLEL_CHEAPEST_INSERTION">PARALLEL_CHEAPEST_INSERTION - Parallel insertion</option>
+                  <option value="LOCAL_CHEAPEST_INSERTION">LOCAL_CHEAPEST_INSERTION - Nearby insertion</option>
+                  <option value="GLOBAL_CHEAPEST_ARC">GLOBAL_CHEAPEST_ARC - Globally best edge</option>
+                  <option value="LOCAL_CHEAPEST_ARC">LOCAL_CHEAPEST_ARC - Locally best edge</option>
+                  <option value="FIRST_UNBOUND_MIN_VALUE">FIRST_UNBOUND_MIN_VALUE - Choose min value</option>
+                  <option value="ALL_UNPERFORMED">ALL_UNPERFORMED - Skip all locations</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Optimize Button -->
+          <button
+            id="optimizeButton"
+            class="w-full bg-indigo-600 text-white font-medium py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 flex items-center justify-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Optimize Route
+          </button>
+
+          <!-- Status Message -->
+          <div id="statusMessage" class="mt-3 text-sm font-medium text-center h-6"></div>
+        </div>
+      </div>
+
+      <!-- Map & Results Column -->
+      <div class="lg:col-span-2 space-y-6">
+        <!-- Map Card -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition-all hover:shadow">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              Route Map
+            </h2>
+            <div class="flex space-x-2">
+              <button id="resetMapButton" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all">
+                Reset View
+              </button>
+              <button id="toggleSatelliteButton" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all">
+                Toggle Satellite
+              </button>
+            </div>
+          </div>
+          <div id="map" class="w-full"></div>
+        </div>
+
+        <!-- API Response Card -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition-all hover:shadow">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+              </svg>
+              API Response
+            </h2>
+            <div class="flex space-x-2">
+              <button id="formatJsonButton" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all">
+                Format JSON
+              </button>
+              <button id="copyResponseButton" class="bg-gray-100 text-gray-700 px-3 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 transition-all flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Copy
+              </button>
+            </div>
+          </div>
+          <div class="relative">
+            <pre id="apiResponse" class="bg-gray-50 border border-gray-200 p-4 rounded-lg overflow-auto text-sm font-mono h-64 transition-all">
+              <code class="text-gray-700">Response data will appear here...</code>
+            </pre>
+            <div id="loadingOverlay" class="absolute inset-0 bg-gray-50 bg-opacity-80 rounded-lg hidden flex items-center justify-center">
+              <div class="flex flex-col items-center">
+                <svg class="animate-spin h-8 w-8 text-indigo-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-sm font-medium text-gray-700">Processing...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route Statistics Card (Hidden until results available) -->
+        <div id="routeStatsCard" class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 transition-all hover:shadow hidden">
+          <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Route Statistics
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-indigo-50 p-4 rounded-lg">
+              <p class="text-xs text-indigo-700 font-medium mb-1">Total Distance</p>
+              <p id="totalDistance" class="text-2xl font-bold text-indigo-800">-- km</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <p class="text-xs text-blue-700 font-medium mb-1">Total Duration</p>
+              <p id="totalDuration" class="text-2xl font-bold text-blue-800">-- min</p>
+            </div>
+            <div class="bg-purple-50 p-4 rounded-lg">
+              <p class="text-xs text-purple-700 font-medium mb-1">Locations Visited</p>
+              <p id="locationsVisited" class="text-2xl font-bold text-purple-800">--</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto bg-gray-800 text-white py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row justify-between items-center">
+        <div class="flex items-center mb-4 md:mb-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          </svg>
+          <span class="font-medium">Route Optimizer</span>
+        </div>
+        <p class="text-sm text-gray-300">© 2025 Route Optimizer. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- Leaflet Polyline Decorator -->
+  <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+
+  <!-- Custom JavaScript -->
+  <script src="/static/script.js"></script>
+</body>
+</html>
